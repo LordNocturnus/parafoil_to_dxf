@@ -22,7 +22,10 @@ class Parafoil(object):
         self.cord_lines = []
         self.thickness_lines = []
         self.temp = []
+        self.tip_right = []
+        self.tip_left = []
         self.construct(acc)
+
 
     def construct(self, acc=100):
         # --- Center Cell ---
@@ -81,11 +84,14 @@ class Parafoil(object):
             self.airfoils.append(self.airfoil.generate(self.cord_lines[-1].get_rel_vec(1.0),
                                                        self.thickness_lines[-1].get_rel_vec(1.0), acc))
 
-            theta0 = self.airfoils[-1].n.get_angle(temp_plane.n)
+            theta0 = self.airfoils[-2].n.get_angle(temp_plane.n)
             self.cord_lines[-1] = self.cord_lines[-2].rotate(self.cord_lines[-1], theta0)
             self.thickness_lines[-1] = self.cord_lines[-2].rotate(self.thickness_lines[-1], theta0)
             self.airfoils[-1] = self.cord_lines[-2].rotate(self.airfoils[-1], theta0)
             temp_plane = self.cord_lines[-2].rotate(temp_plane, theta0)
+            self.leading_edge_lines[-1] = self.cord_lines[-2].rotate(self.leading_edge_lines[-1], theta0)
+            self.temp[-1] = self.cord_lines[-2].rotate(self.temp[-1], theta0)
+            self.trailing_edge_lines[-1] = self.cord_lines[-2].rotate(self.trailing_edge_lines[-1], theta0)
             theta = temp_plane.n.get_angle(self.airfoils[-1].n)
             self.thickness_lines[-1] = self.cord_lines[-1].rotate(self.thickness_lines[-1], theta)
             self.airfoils[-1] = self.cord_lines[-1].rotate(self.airfoils[-1], theta)
@@ -103,22 +109,39 @@ class Parafoil(object):
                 elif not np.sign(l1) == np.sign(l2):
                     lim[0] = np.average(lim)
                 else:
-                    raise ValueError("Invalid size of top panel")
+                    raise ValueError(f"Invalid size of top panel {t}")
             theta = np.average(lim)
-            self.airfoils[-1] = self.cord_lines[-1].rotate(self.airfoils[-1], theta)
-            self.thickness_lines[-1] = self.cord_lines[-1].rotate(self.thickness_lines[-1], theta)
+
             self.airfoils[-1] = self.cord_lines[-2].rotate(self.airfoils[-1], theta)
             self.thickness_lines[-1] = self.cord_lines[-2].rotate(self.thickness_lines[-1], theta)
             self.cord_lines[-1] = self.cord_lines[-2].rotate(self.cord_lines[-1], theta)
-            self.leading_edge_lines[-1] = self.cord_lines[-2].rotate(self.leading_edge_lines[-1], theta + theta0)
-            self.temp[-1] = self.cord_lines[-2].rotate(self.temp[-1], theta + theta0)
-            self.trailing_edge_lines[-1] = self.cord_lines[-2].rotate(self.trailing_edge_lines[-1], theta + theta0)
+            self.leading_edge_lines[-1] = self.cord_lines[-2].rotate(self.leading_edge_lines[-1], theta)
+            self.temp[-1] = self.cord_lines[-2].rotate(self.temp[-1], theta)
+            self.trailing_edge_lines[-1] = self.cord_lines[-2].rotate(self.trailing_edge_lines[-1], theta)
+            self.airfoils[-1] = self.cord_lines[-1].rotate(self.airfoils[-1], theta)
+            self.thickness_lines[-1] = self.cord_lines[-1].rotate(self.thickness_lines[-1], theta)
 
             self.lines.append(self.thickness_lines[-1].p1.span(self.thickness_lines[-2].p1))
             self.lines.append(self.thickness_lines[-1].get_rel_point(self.airfoil.lower_func(
                 self.airfoil.max_t_point)).span(self.thickness_lines[-2].get_rel_point(self.airfoil.lower_func(
                 self.airfoil.max_t_point))))
         # -------------------------------
+
+        """# --- tip ---
+        relative_trail = np.zeros(3, dtype=float)
+        relative_trail[0] = self.trailing_edge[-1] * np.cos(self.cord_lines[-1].angle_xz +
+                                                           np.arcsin(self.trailing_edge_horizontal[-1] /
+                                                                     self.trailing_edge[-1]) - np.pi)
+        relative_trail[2] = self.trailing_edge[-1] * np.sin(self.cord_lines[-1].angle_xz +
+                                                           np.arcsin(self.trailing_edge_horizontal[-1] /
+                                                                     self.trailing_edge[-1]) - np.pi)
+        self.trailing_edge_lines.append(vectors.Vector(relative_trail, self.trailing_edge_lines[-1].p1,
+                                                       self.trailing_edge[-1]))
+        self.tip_right.append(vectors.Vector(np.asarray([np.cos(self.leading_edge_lines[-1].angle_xz),
+                                                         0.0,
+                                                         np.sin(self.leading_edge_lines[-1].angle_xz)]),
+                                             self.leading_edge_lines[-1].p1))
+        # -----------"""
         self.mirror()
         self.update_limits()
 
@@ -155,6 +178,9 @@ class Parafoil(object):
             lines.append(mirror_plane.mirror(self.lines[-l]))
         self.lines = lines + self.lines
 
+        for l in range(1, len(self.tip_right) + 1):
+            self.tip_left.append(mirror_plane.mirror(self.tip_right[-l]))
+
         airfoils = []
         for l in range(1, len(self.airfoils) + 1):
             airfoils.append(mirror_plane.mirror(self.airfoils[-l]))
@@ -172,6 +198,16 @@ class Parafoil(object):
                 self.limits[d][1] = max(self.limits[d][1], a.limits[d][1])
 
         for l in self.lines:
+            for d in range(0, len(self.limits)):
+                self.limits[d][0] = min(self.limits[d][0], l.limits[d][0])
+                self.limits[d][1] = max(self.limits[d][1], l.limits[d][1])
+
+        for l in self.tip_left:
+            for d in range(0, len(self.limits)):
+                self.limits[d][0] = min(self.limits[d][0], l.limits[d][0])
+                self.limits[d][1] = max(self.limits[d][1], l.limits[d][1])
+
+        for l in self.tip_right:
             for d in range(0, len(self.limits)):
                 self.limits[d][0] = min(self.limits[d][0], l.limits[d][0])
                 self.limits[d][1] = max(self.limits[d][1], l.limits[d][1])
@@ -202,6 +238,10 @@ class Parafoil(object):
         for l in self.trailing_edge_lines:
             l.draw(window, offset, scale, view, c2)
         for l in self.lines:
+            l.draw(window, offset, scale, view, c2)
+        for l in self.tip_left:
+            l.draw(window, offset, scale, view, c2)
+        for l in self.tip_right:
             l.draw(window, offset, scale, view, c2)
         for a in self.airfoils:
             a.draw(window, offset, scale, view, c1)
@@ -347,6 +387,9 @@ class Parafoil(object):
         for p in range(0, len(points)):
             lines.append(points[p - 1].span(points[p]))
         return vectors.Dxf(lines)
+
+    def export_tip(self, id, side, acc, allowance_sides, allowance_front, allowance_back, debug=False):
+        pass
 
     def export(self, acc, allowance_sides, allowance_front, allowance_back, allowance_top, allowance_bot, name):
         for c in range(0, len(self.leading_edge_lines)):
