@@ -1,7 +1,9 @@
+from ezdxf import units
 from scipy import interpolate
 import numpy as np
 import scipy as sp
 import pygame as pg
+import ezdxf
 
 
 class Point(object):
@@ -285,10 +287,8 @@ class VectorAirfoilFactory(object):
         points2d = []
         for c in np.arange(0.0, 1.0 + 1 / acc, 1 / acc):
             points2d.append([c * cord_line.length, self.upper_func(c) * thickness_line.length])
-        print(len(points2d))
         for c in np.arange(1.0 - 1 / acc,  0.0, -1 / acc):
             points2d.append([c * cord_line.length, self.lower_func(c) * thickness_line.length])
-        print(len(points2d))
         return VectorAirfoil(np.asarray(points2d), cord_line, thickness_line)
 
 
@@ -389,6 +389,16 @@ class Dxf(object):
     def draw(self, window, offset, scale, view, color):
         for l in self.lines:
             l.draw(window, offset, scale, view, color)
+
+    def export(self, name):
+        doc = ezdxf.new()
+        doc.units = ezdxf.units.M
+        msp = doc.modelspace()
+        for i in range(0, len(self.lines)):
+            p0 = np.asarray([self.lines[i].p0.pos[0], self.lines[i].p0.pos[1]]) * 1000
+            p1 = np.asarray([self.lines[i].p1.pos[0], self.lines[i].p1.pos[1]]) * 1000
+            msp.add_line(p0, p1)
+        doc.saveas(f"dxf/{name}.dxf")
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ class Parafoil(object):
                                          self.thickness_lines[0].get_rel_point(
                                              self.airfoil.lower_func(self.airfoil.max_t_point)).pos[0]))
         self.airfoils.append(self.airfoil.generate(self.cord_lines[0].get_rel_vec(1.0),
-                                                   self.thickness_lines[0].get_rel_vec(1.0)))
+                                                   self.thickness_lines[0].get_rel_vec(1.0), acc))
         # -------------------
 
         # --- other cells except last ---
@@ -79,7 +79,7 @@ class Parafoil(object):
                                                        self.cord_lines[-1].get_rel_point(self.airfoil.max_t_point),
                                                        self.thickness[t] * self.airfoil.ratio))
             self.airfoils.append(self.airfoil.generate(self.cord_lines[-1].get_rel_vec(1.0),
-                                                       self.thickness_lines[-1].get_rel_vec(1.0)))
+                                                       self.thickness_lines[-1].get_rel_vec(1.0), acc))
 
             theta0 = self.airfoils[-1].n.get_angle(temp_plane.n)
             self.cord_lines[-1] = self.cord_lines[-2].rotate(self.cord_lines[-1], theta0)
@@ -127,13 +127,17 @@ class Parafoil(object):
                                      vectors.Vector(np.asarray([0.0, 0.0, 1.0])),
                                      vectors.Point(np.zeros(3)))
         trailing_edge_lines = []
-        for l in range(1, len(self.trailing_edge_lines) + 1):
+        for l in range(1, len(self.trailing_edge_lines)):
             trailing_edge_lines.append(mirror_plane.mirror(self.trailing_edge_lines[-l]))
+        self.trailing_edge_lines[0].origin = self.trailing_edge_lines[0].p1
+        self.trailing_edge_lines[0].scale(-2)
         self.trailing_edge_lines = trailing_edge_lines + self.trailing_edge_lines
 
         leading_edge_lines = []
-        for l in range(1, len(self.leading_edge_lines) + 1):
+        for l in range(1, len(self.leading_edge_lines)):
             leading_edge_lines.append(mirror_plane.mirror(self.leading_edge_lines[-l]))
+        self.leading_edge_lines[0].origin = self.leading_edge_lines[0].p1
+        self.leading_edge_lines[0].scale(-2)
         self.leading_edge_lines = leading_edge_lines + self.leading_edge_lines
 
         cord_lines = []
@@ -343,4 +347,14 @@ class Parafoil(object):
         for p in range(0, len(points)):
             lines.append(points[p - 1].span(points[p]))
         return vectors.Dxf(lines)
+
+    def export(self, acc, allowance_sides, allowance_front, allowance_back, allowance_top, allowance_bot, name):
+        for c in range(0, len(self.leading_edge_lines)):
+            dxf = self.airfoils[c].to_dxf(allowance_top, allowance_bot)
+            dxf.export(f"{name}_Rib_{c}")
+            dxf = self.cell_to_dxf(c, "top", acc, allowance_sides, allowance_front, allowance_back)
+            dxf.export(f"{name}_top_{c+1}")
+            dxf = self.cell_to_dxf(c, "bot", acc, allowance_sides, allowance_front, allowance_back)
+            dxf.export(f"{name}_bottom_{c + 1}")
+
 
