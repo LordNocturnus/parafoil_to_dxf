@@ -10,7 +10,7 @@ red = (255, 0, 0)
 green = (0, 255, 0)
 blue = (0, 0, 255)
 white = (255, 255, 255)
-acc = 100
+acc = 250
 # -----------------
 
 
@@ -21,8 +21,9 @@ def load_foil(name):
 
 
 if __name__ == "__main__":
-    data = load_foil("Parafoil_1")
+    data = load_foil("Parafoil_0")
     foil = constructor.Parafoil(data, acc)
+    foil.export(acc, 0.02, 0.02, 0.01, 0.02, 0.02, "Parafoil_0")
     #foil_dxf = foil.airfoils[1].to_dxf(0.02, 0.02)
     #foil_dxf = foil.cell_to_dxf(0, "top", acc, 0.02, 0.02, 0.01)
     foil_dxf = foil.cell_to_dxf(0, "bot", acc, 0.02, 0.02, 0.01)
