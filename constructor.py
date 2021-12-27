@@ -180,18 +180,18 @@ class Parafoil(object):
                                      vectors.Vector(np.asarray([0.0, 0.0, 1.0])),
                                      vectors.Point(np.zeros(3)))
         trailing_edge_lines = []
-        for l in range(1, len(self.trailing_edge_lines)):
+        for l in range(1, len(self.trailing_edge_lines) + 1):
             trailing_edge_lines.append(mirror_plane.mirror(self.trailing_edge_lines[-l]))
-        self.trailing_edge_lines[0].origin = self.trailing_edge_lines[0].p1
-        self.trailing_edge_lines[0].scale(-2)
-        self.trailing_edge_lines = trailing_edge_lines + self.trailing_edge_lines
+        self.trailing_edge_lines[0].origin = trailing_edge_lines[-1].p1
+        self.trailing_edge_lines[0].scale(2)
+        self.trailing_edge_lines = trailing_edge_lines[:-1] + self.trailing_edge_lines
 
         leading_edge_lines = []
-        for l in range(1, len(self.leading_edge_lines)):
+        for l in range(1, len(self.leading_edge_lines) + 1):
             leading_edge_lines.append(mirror_plane.mirror(self.leading_edge_lines[-l]))
-        self.leading_edge_lines[0].origin = self.leading_edge_lines[0].p1
-        self.leading_edge_lines[0].scale(-2)
-        self.leading_edge_lines = leading_edge_lines + self.leading_edge_lines
+        self.leading_edge_lines[0].origin = leading_edge_lines[-1].p1
+        self.leading_edge_lines[0].scale(2)
+        self.leading_edge_lines = leading_edge_lines[:-1] + self.leading_edge_lines
 
         cord_lines = []
         for l in range(1, len(self.cord_lines) + 1):

@@ -22,10 +22,10 @@ def load_foil(name):
 
 if __name__ == "__main__":
     data = load_foil("Parafoil_4")
-    foil = constructor.Parafoil(data, acc, 1.0)
+    foil = constructor.Parafoil(data, acc, 1)
     foil.export(acc, 0.02, 0.02, 0.01, 0.02, 0.02, "Parafoil_4")
     #foil_dxf = foil.airfoils[0].to_dxf(0.02, 0.02)
-    foil_dxf = foil.cell_to_dxf(0, "top", acc, 0.02, 0.02, 0.01)
+    foil_dxf = foil.cell_to_dxf(7, "top", acc, 0.01, 0.01, 0.01)
     #foil_dxf = foil.cell_to_dxf(0, "bot", acc, 0.02, 0.02, 0.01)
     #foil_dxf = foil.cell_to_dxf(1, "top", acc, 0.02, 0.02, 0.01)
     #foil_dxf = foil.cell_to_dxf(1, "bot", acc, 0.02, 0.02, 0.01)
@@ -66,6 +66,7 @@ if __name__ == "__main__":
         foil.draw(gameDisplay, origin[1], scale, "y", red, green, blue, white, True)
         foil.draw(gameDisplay, origin[2], scale, "z", red, green, blue, white, True)
         foil_dxf.draw(gameDisplay, origin[3], scale_dxf, "z", red)
+        pg.draw.circle(gameDisplay, blue, origin[3], 2)
 
         pg.display.update()
         clock.tick(60)

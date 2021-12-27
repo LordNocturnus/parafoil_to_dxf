@@ -395,8 +395,8 @@ class Dxf(object):
         doc.units = ezdxf.units.M
         msp = doc.modelspace()
         for i in range(0, len(self.lines)):
-            p0 = np.asarray([self.lines[i].p0.pos[0], self.lines[i].p0.pos[1]]) * 1000
-            p1 = np.asarray([self.lines[i].p1.pos[0], self.lines[i].p1.pos[1]]) * 1000
+            p0 = np.asarray([self.lines[i].p0.pos[0], self.lines[i].p0.pos[1]])# * 1000
+            p1 = np.asarray([self.lines[i].p1.pos[0], self.lines[i].p1.pos[1]])# * 1000
             msp.add_line(p0, p1)
         doc.saveas(f"dxf/{name}.dxf")
 
