@@ -6,14 +6,14 @@ import vectors
 
 class Parafoil(object):
 
-    def __init__(self, data, acc=100):
+    def __init__(self, data, acc=100, scale=1.0):
         self.airfoil = vectors.VectorAirfoilFactory(data["airfoil"], acc)
-        self.cord = np.asarray(data["cord"])
-        self.thickness = np.asarray(data["thickness"])
-        self.trailing_edge = np.asarray(data["trailing_edge"])
-        self.trailing_edge_horizontal = np.asarray(data["trailing_edge_horizontal"])
-        self.leading_edge = np.asarray(data["leading_edge"])
-        self.top = np.asarray(data["top"])
+        self.cord = np.asarray(data["cord"]) * scale
+        self.thickness = np.asarray(data["thickness"]) * scale
+        self.trailing_edge = np.asarray(data["trailing_edge"]) * scale
+        self.trailing_edge_horizontal = np.asarray(data["trailing_edge_horizontal"]) * scale
+        self.leading_edge = np.asarray(data["leading_edge"]) * scale
+        self.top = np.asarray(data["top"]) * scale
         self.limits = np.zeros((3, 2), dtype=float)
         self.airfoils = []
         self.lines = []
@@ -24,7 +24,6 @@ class Parafoil(object):
         self.tip_right = []
         self.tip_left = []
         self.construct(acc)
-
 
     def construct(self, acc=100):
         # --- Center Cell ---
