@@ -13,7 +13,12 @@ class Parafoil(object):
         self.trailing_edge = np.asarray(data["trailing_edge"]) * scale
         self.trailing_edge_horizontal = np.asarray(data["trailing_edge_horizontal"]) * scale
         self.leading_edge = np.asarray(data["leading_edge"]) * scale
+        self.back_offset = np.asarray(data["back_offset"]) * scale
         self.top = np.asarray(data["top"]) * scale
+        self.bottom_cutoff = np.asarray(data["bottom_cutoff"]) * scale
+        self.top_cutoff_side = np.asarray(data["top_cutoff_side"])
+        self.top_cutoff = np.asarray(data["top_cutoff"]) * scale
+        self.rib_cutoff = np.asarray(data["rib_cutoff"]) * scale
         self.limits = np.zeros((3, 2), dtype=float)
         self.airfoils = []
         self.lines = []
@@ -48,8 +53,13 @@ class Parafoil(object):
                                              self.airfoil.lower_func(self.airfoil.max_t_point)),
                                          self.thickness_lines[0].get_rel_point(
                                              self.airfoil.lower_func(self.airfoil.max_t_point)).pos[0]))
+        self.lines.append(vectors.Vector(np.asarray([-1.0, 0.0, 0.0]),
+                                         self.cord_lines[-1].get_abs_point(self.cord[0] - self.back_offset[
+                                             int(np.floor(len(self.back_offset) / 2))]),
+                                         self.cord_lines[-1].get_abs_point(self.cord[0] - self.back_offset[
+                                             int(np.floor(len(self.back_offset) / 2))]).pos[0]))
         self.airfoils.append(self.airfoil.generate(self.cord_lines[0].get_rel_vec(1.0),
-                                                   self.thickness_lines[0].get_rel_vec(1.0), acc))
+                                                   self.thickness_lines[0].get_rel_vec(1.0), self.back_offset[0], acc))
         # -------------------
 
         # --- other cells except last ---
@@ -81,7 +91,8 @@ class Parafoil(object):
                                                        self.cord_lines[-1].get_rel_point(self.airfoil.max_t_point),
                                                        self.thickness[t] * self.airfoil.ratio))
             self.airfoils.append(self.airfoil.generate(self.cord_lines[-1].get_rel_vec(1.0),
-                                                       self.thickness_lines[-1].get_rel_vec(1.0), acc))
+                                                       self.thickness_lines[-1].get_rel_vec(1.0), self.back_offset[t],
+                                                       acc))
 
             theta0 = self.airfoils[-2].n.get_angle(temp_plane.n)
             self.cord_lines[-1] = self.cord_lines[-2].rotate(self.cord_lines[-1], theta0)
@@ -122,6 +133,10 @@ class Parafoil(object):
             self.lines.append(self.thickness_lines[-1].get_rel_point(self.airfoil.lower_func(
                 self.airfoil.max_t_point)).span(self.thickness_lines[-2].get_rel_point(self.airfoil.lower_func(
                 self.airfoil.max_t_point))))
+            self.lines.append(self.cord_lines[-2].get_abs_point(self.cord[t-1] - self.back_offset[
+                                             int(np.floor(len(self.back_offset) / 2))+t-1]).span(
+                self.cord_lines[-1].get_abs_point(self.cord[t] - self.back_offset[
+                    int(np.floor(len(self.back_offset) / 2))+t])))
         # -------------------------------
 
         # --- tip ---
@@ -252,7 +267,7 @@ class Parafoil(object):
                 self.limits[d][0] = min(self.limits[d][0], l.limits[d][0])
                 self.limits[d][1] = max(self.limits[d][1], l.limits[d][1])
 
-    def draw(self, window, offset, scale, view, c1, c2, c3, c4, inner=True):
+    def draw(self, window, offset, scale, view, c1, c2, c3, lim, inner=True):
         if inner:
             for l in self.cord_lines:
                 l.draw(window, offset, scale, view, c3)
@@ -271,47 +286,23 @@ class Parafoil(object):
         for a in self.airfoils:
             a.draw(window, offset, scale, view, c1)
 
-    def cell_to_dxf(self, id, side, acc, allowance_sides, allowance_front, allowance_back, debug=False):
-        if id == 0:
-            return self.tip_to_dxf("left", side, acc, allowance_sides, allowance_back, debug)
-        elif id == len(self.trailing_edge_lines) - 1:
-            return self.tip_to_dxf("right", side, acc, allowance_sides, allowance_back, debug)
+    def flatten(self, points_left, points_right, prev_angle_left, prev_angle_right, p_left, p_right, allowance, id,
+                debug):
         rotator = vectors.Vector(np.asarray([0.0, 0.0, 1.0]))
-        points_right = [vectors.Point(np.zeros(3, dtype=float)),
-                        vectors.Point(np.asarray([allowance_front, 0.0, 0.0]))]
-        points_left = [vectors.Point(np.asarray([0.0, self.leading_edge_lines[id - 1].length, 0.0])),
-                       vectors.Point(np.asarray([allowance_front, self.leading_edge_lines[id - 1].length, 0.0]))]
-        prev_angle_right = np.pi
-        prev_angle_left = -np.pi
-        if side == "top":
-            lines_left = self.airfoils[id - 1].lines[:acc]
-            lines_right = self.airfoils[id].lines[:acc]
-        elif side == "bot":
-            lines_left = self.airfoils[id - 1].lines[acc:]
-            lines_left.reverse()
-            lines_right = self.airfoils[id].lines[acc:]
-            lines_right.reverse()
-        for l in range(0, len(lines_left)):  # TODO: make with curved center
+        if len(p_left) == 1 and len(p_right) == 1:
+            return points_left, points_right, prev_angle_left, prev_angle_right
+        for p in range(1, min(len(p_left), len(p_right))):  # TODO: make with curved center
+            line_left = self.airfoils[id - 1].get_point(p_left[p - 1]).span(self.airfoils[id - 1].get_point(p_left[p]))
+            line_right = self.airfoils[id].get_point(p_right[p - 1]).span(self.airfoils[id].get_point(p_right[p]))
             temp_straight = points_right[-1].span(points_left[-1])
-            if side == "top":
-                straight_3d = lines_left[l].p0.span(lines_right[l].p0).length
-            elif side == "bot":
-                straight_3d = lines_left[l].p1.span(lines_right[l].p1).length
-            straight_3d = np.average(np.asarray([temp_straight.length, straight_3d]))
+            straight_3d = line_left.p0.span(line_right.p0)
+            straight_3d = np.average(np.asarray([temp_straight.length, straight_3d.length]))
             rotator.origin = temp_straight.p0
-            if side == "top":
-                p0 = rotator.rotate(temp_straight, -geometry.cos_rule(lines_right[l].length, straight_3d,
-                                                                      lines_right[l].p1.span(
-                                                                          lines_left[l].p0).length)
-                                    ).get_abs_point(lines_right[l].length)
-            elif side == "bot":
-                p0 = rotator.rotate(temp_straight, -geometry.cos_rule(lines_right[l].length, straight_3d,
-                                                                      lines_right[l].p0.span(
-                                                                          lines_left[l].p1).length)
-                                    ).get_abs_point(lines_right[l].length)
+            p0 = rotator.rotate(temp_straight, -geometry.cos_rule(line_right.length, straight_3d, line_right.p1.span(
+                line_left.p0).length)).get_abs_point(line_right.length)
             rotator.origin = points_right[-1]
             v = points_right[-1].span(p0)
-            p1 = rotator.rotate(v, -np.pi / 2).get_abs_point(allowance_sides)
+            p1 = rotator.rotate(v, -np.pi / 2).get_abs_point(allowance)
             if v.angle_yx > prev_angle_right:
                 points_right.append(points_right[-2])
                 points_right[-3] = p1
@@ -319,24 +310,16 @@ class Parafoil(object):
                 points_right.append(p1)
             prev_angle_right = v.angle_yx
             rotator.origin = p0
-            points_right.append(rotator.rotate(p0.span(points_right[-2]), np.pi / 2).get_abs_point(allowance_sides))
+            points_right.append(rotator.rotate(p0.span(points_right[-2]), np.pi / 2).get_abs_point(allowance))
             points_right.append(p0)
 
             temp_straight = points_left[-1].span(points_right[-4])
             rotator.origin = temp_straight.p0
-            if side == "top":
-                p0 = rotator.rotate(temp_straight, geometry.cos_rule(lines_left[l].length, straight_3d,
-                                                                     lines_left[l].p1.span(
-                                                                         lines_right[l].p0).length)
-                                    ).get_abs_point(lines_left[l].length)
-            elif side == "bot":
-                p0 = rotator.rotate(temp_straight, geometry.cos_rule(lines_left[l].length, straight_3d,
-                                                                     lines_left[l].p0.span(
-                                                                         lines_right[l].p1).length)
-                                    ).get_abs_point(lines_left[l].length)
+            p0 = rotator.rotate(temp_straight, geometry.cos_rule(line_left.length, straight_3d, line_left.p1.span(
+                line_right.p0).length)).get_abs_point(line_left.length)
             rotator.origin = points_left[-1]
             v = points_left[-1].span(p0)
-            p1 = rotator.rotate(v, np.pi / 2).get_abs_point(allowance_sides)
+            p1 = rotator.rotate(v, np.pi / 2).get_abs_point(allowance)
             if v.angle_yx < prev_angle_left:
                 points_left.append(points_left[-2])
                 points_left[-3] = p1
@@ -344,17 +327,155 @@ class Parafoil(object):
                 points_left.append(p1)
             prev_angle_left = v.angle_yx
             rotator.origin = p0
-            points_left.append(rotator.rotate(p0.span(points_left[1]), -np.pi / 2).get_abs_point(allowance_sides))
+            points_left.append(rotator.rotate(p0.span(points_left[1]), -np.pi / 2).get_abs_point(allowance))
             points_left.append(p0)
-            if not debug and not l == 0:
+            if not debug and not p == 1:
                 points_right.pop(-4)
                 points_left.pop(-4)
+        return points_left, points_right, prev_angle_left, prev_angle_right
+
+    def cell_to_dxf(self, id, side, acc, allowance_sides, allowance_front, allowance_back, allowance_offset,
+                    debug=False):
+        if id == 0:
+            return self.tip_to_dxf("left", side, acc, allowance_sides, allowance_back, debug)
+        elif id == len(self.trailing_edge_lines) - 1:
+            return self.tip_to_dxf("right", side, acc, allowance_sides, allowance_back, debug)
+        rotator = vectors.Vector(np.asarray([0.0, 0.0, 1.0]))
+
+        points_right = [vectors.Point(np.zeros(3, dtype=float)),
+                        vectors.Point(np.asarray([allowance_back, 0.0, 0.0]))]
+        points_left = [vectors.Point(np.asarray([0.0, self.trailing_edge_lines[id].length, 0.0])),
+                       vectors.Point(np.asarray([allowance_back, self.trailing_edge_lines[id].length, 0.0]))]
+        prev_angle_right = np.pi
+        prev_angle_left = -np.pi
+        if side == "top":
+            if not self.back_offset[id - 1] == 0.0:
+                c = np.linspace(self.airfoils[id - 1].length, self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                acc)
+                po_left = np.transpose(np.asarray([c, self.airfoils[id - 1].upper(c)]))
+            else:
+                po_left = np.asarray([[self.airfoils[id - 1].length,
+                                       self.airfoils[id - 1].upper(self.airfoils[id - 1].length)]])
+            if not self.back_offset[id] == 0.0:
+                c = np.linspace(self.airfoils[id].length, self.airfoils[id].length - self.back_offset[id],
+                                acc)
+                po_right = np.transpose(np.asarray([c, self.airfoils[id].upper(c)]))
+            else:
+                po_right = np.asarray([[self.airfoils[id].length,
+                                        self.airfoils[id].upper(self.airfoils[id].length)]])
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, po_left,
+                                                                                        po_right, allowance_offset, id,
+                                                                                        debug)
+            if not self.rib_cutoff[id - 1] == 0.0:
+                c = np.linspace(self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                self.airfoils[id - 1].length - self.back_offset[id - 1] - self.rib_cutoff[id - 1],
+                                acc)
+                pc_left = np.transpose(np.asarray([c, self.airfoils[id - 1].upper(c)]))
+            else:
+                pc_left = np.asarray([[self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                       self.airfoils[id - 1].upper(
+                                           self.airfoils[id - 1].length - self.back_offset[id - 1])]])
+            if not self.rib_cutoff[id] == 0.0:
+                c = np.linspace(self.airfoils[id].length - self.back_offset[id],
+                                self.airfoils[id].length - self.back_offset[id] - self.rib_cutoff[id],
+                                acc)
+                pc_right = np.transpose(np.asarray([c, self.airfoils[id].upper(c)]))
+            else:
+                pc_right = np.asarray([[self.airfoils[id].length - self.back_offset[id], self.airfoils[id].upper(
+                                           self.airfoils[id].length - self.back_offset[id])]])
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, pc_left,
+                                                                                        pc_right, allowance_offset, id,
+                                                                                        debug)
+            if self.top_cutoff_side[id - 1] == "t":
+                c = np.linspace(self.airfoils[id - 1].length - self.back_offset[id - 1] - self.rib_cutoff[id - 1],
+                                self.top_cutoff[id - 1], acc)
+                pt_left = np.transpose(np.asarray([c, self.airfoils[id - 1].upper(c)]))
+
+            elif self.top_cutoff_side[id - 1] == "b":
+                c = np.linspace(self.airfoils[id - 1].length - self.back_offset[id - 1] - self.rib_cutoff[id - 1],
+                                0.0, acc, endpoint=False)
+                pt_left = np.transpose(np.asarray([c, self.airfoils[id - 1].upper(c)]))
+                c = np.linspace(0.0, self.top_cutoff[id - 1], acc)
+                pt_left = np.append(pt_left, np.transpose(np.asarray([c, self.airfoils[id - 1].lower(c)])), 0)
+            if self.top_cutoff_side[id] == "t":
+                c = np.linspace(self.airfoils[id].length - self.back_offset[id] - self.rib_cutoff[id],
+                                self.top_cutoff[id], acc)
+                pt_right = np.transpose(np.asarray([c, self.airfoils[id].upper(c)]))
+            elif self.top_cutoff_side[id] == "b":
+                c = np.linspace(self.airfoils[id].length - self.back_offset[id] - self.rib_cutoff[id],
+                                0.0, acc, endpoint=False)
+                pt_right = np.transpose(np.asarray([c, self.airfoils[id].upper(c)]))
+                c = np.linspace(0.0, self.top_cutoff[id], acc)
+                pt_right = np.append(pt_right, np.transpose(np.asarray([c, self.airfoils[id].lower(c)])), 0)
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, pt_left,
+                                                                                        pt_right, allowance_offset,
+                                                                                        id, debug)
+        elif side == "bot":
+            if not self.back_offset[id - 1] == 0.0:
+                c = np.linspace(self.airfoils[id - 1].length, self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                acc)
+                po_left = np.transpose(np.asarray([c, self.airfoils[id - 1].lower(c)]))
+            else:
+                po_left = np.asarray([[self.airfoils[id - 1].length,
+                                       self.airfoils[id - 1].lower(self.airfoils[id - 1].length)]])
+            if not self.back_offset[id] == 0.0:
+                c = np.linspace(self.airfoils[id].length, self.airfoils[id].length - self.back_offset[id],
+                                acc)
+                po_right = np.transpose(np.asarray([c, self.airfoils[id].lower(c)]))
+            else:
+                po_right = np.asarray([[self.airfoils[id].length,
+                                        self.airfoils[id].lower(self.airfoils[id].length)]])
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, po_left,
+                                                                                        po_right, allowance_offset, id,
+                                                                                        debug)
+            if not self.rib_cutoff[id - 1] == 0.0:
+                c = np.linspace(self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                self.airfoils[id - 1].length - self.back_offset[id - 1] - self.rib_cutoff[id - 1],
+                                acc)
+                pc_left = np.transpose(np.asarray([c, self.airfoils[id - 1].lower(c)]))
+            else:
+                pc_left = np.asarray([[self.airfoils[id - 1].length - self.back_offset[id - 1],
+                                       self.airfoils[id - 1].lower(
+                                           self.airfoils[id - 1].length - self.back_offset[id - 1])]])
+            if not self.rib_cutoff[id] == 0.0:
+                c = np.linspace(self.airfoils[id].length - self.back_offset[id],
+                                self.airfoils[id].length - self.back_offset[id] - self.rib_cutoff[id],
+                                acc)
+                pc_right = np.transpose(np.asarray([c, self.airfoils[id].lower(c)]))
+            else:
+                pc_right = np.asarray([[self.airfoils[id].length - self.back_offset[id], self.airfoils[id].lower(
+                    self.airfoils[id].length - self.back_offset[id])]])
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, pc_left,
+                                                                                        pc_right, allowance_offset, id,
+                                                                                        debug)
+            c = np.linspace(self.airfoils[id - 1].length - self.back_offset[id - 1] - self.rib_cutoff[id - 1],
+                            self.bottom_cutoff[id - 1], acc)
+            pt_left = np.transpose(np.asarray([c, self.airfoils[id - 1].lower(c)]))
+            c = np.linspace(self.airfoils[id].length - self.back_offset[id] - self.rib_cutoff[id],
+                            self.bottom_cutoff[id], acc)
+            pt_right = np.transpose(np.asarray([c, self.airfoils[id].lower(c)]))
+            points_left, points_right, prev_angle_left, prev_angle_right = self.flatten(points_left, points_right,
+                                                                                        prev_angle_left,
+                                                                                        prev_angle_right, pt_left,
+                                                                                        pt_right, allowance_offset,
+                                                                                        id, debug)# """
+
         temp_straight = points_right[-1].span(points_left[-1])
         rotator.origin = temp_straight.p0
-        points_right.append(rotator.rotate(temp_straight, -np.pi / 2).get_abs_point(allowance_back))
+        points_right.append(rotator.rotate(temp_straight, -np.pi / 2).get_abs_point(allowance_front))
         temp_straight = points_left[-1].span(points_right[-2])
         rotator.origin = temp_straight.p0
-        points_left.append(rotator.rotate(temp_straight, np.pi / 2).get_abs_point(allowance_back))
+        points_left.append(rotator.rotate(temp_straight, np.pi / 2).get_abs_point(allowance_front))
         points_left.reverse()
 
         points = points_right + points_left
@@ -369,17 +490,17 @@ class Parafoil(object):
             lines_left = self.tip_left
             prev_angle_left = -np.pi
             if side == "top":
-                lines_right = self.airfoils[0].lines[:acc]
+                lines_right = self.airfoils[0].lines(acc)[:acc]
             elif side == "bot":
-                lines_right = self.airfoils[0].lines[acc:]
-                lines_right.reverse()
+                lines_right = self.airfoils[0].lines(acc)[acc:]
+
         elif id == "right":
             lines_left = self.tip_right
             prev_angle_left = -np.pi
             if side == "top":
-                lines_right = self.airfoils[-1].lines[:acc]
+                lines_right = self.airfoils[-1].lines(acc)[:acc]
             elif side == "bot":
-                lines_right = self.airfoils[-1].lines[acc:]
+                lines_right = self.airfoils[-1].lines(acc)[acc:]
                 lines_right.reverse()
         prev_angle_right = lines_left[0].get_angle(lines_right[0])
         points_right = [vectors.Point(np.asarray([allowance_sides * np.cos(prev_angle_right),
@@ -511,14 +632,17 @@ class Parafoil(object):
             lines.append(points[p - 1].span(points[p]))
         return vectors.Dxf(lines)
 
-    def export(self, acc, allowance_sides, allowance_front, allowance_back, allowance_top, allowance_bot, name):
+    def export(self, acc, allowance_sides, allowance_front, allowance_back, allowance_top, allowance_bot,
+               allowance_rib_front, name):
         for c in range(0, len(self.trailing_edge_lines)):
             dxf = self.cell_to_dxf(c, "top", acc, allowance_sides, allowance_front, allowance_back)
             dxf.export(f"{name}_top_{c}")
             dxf = self.cell_to_dxf(c, "bot", acc, allowance_sides, allowance_front, allowance_back)
             dxf.export(f"{name}_bottom_{c}")
             if not c == len(self.trailing_edge_lines) - 1:
-                dxf = self.airfoils[c].to_dxf(allowance_top, allowance_bot)
+                dxf = self.airfoils[c].to_dxf(allowance_top, allowance_bot, allowance_rib_front, self.back_offset[c],
+                                              self.top_cutoff_side[c], self.top_cutoff[c], self.bottom_cutoff[c],
+                                              self.rib_cutoff[c], acc)
                 dxf.export(f"{name}_Rib_{c},{c+1}")
 
 

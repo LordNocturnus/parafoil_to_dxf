@@ -10,7 +10,7 @@ red = (255, 0, 0)
 green = (0, 255, 0)
 blue = (0, 0, 255)
 white = (255, 255, 255)
-acc = 250
+acc = 100
 # -----------------
 
 
@@ -21,26 +21,27 @@ def load_foil(name):
 
 
 if __name__ == "__main__":
-    data = load_foil("Parafoil_4")
-    foil = constructor.Parafoil(data, acc, 1)
-    foil.export(acc, 0.02, 0.02, 0.01, 0.02, 0.02, "Parafoil_4")
-    #foil_dxf = foil.airfoils[0].to_dxf(0.02, 0.02)
-    foil_dxf = foil.cell_to_dxf(7, "top", acc, 0.01, 0.01, 0.01)
+    data = load_foil("Parafoil_0")
+    foil = constructor.Parafoil(data, acc, 1.0)
+    #foil.export(acc, 0.01, 0.01, 0.01, 0.01, 0.01, "Parafoil_4")
+    #foil_dxf = foil.airfoils[4].to_dxf(0.02, 0.02, 0.01, foil.back_offset[4], foil.top_cutoff_side[4],
+                                       #foil.top_cutoff[4], foil.bottom_cutoff[4], foil.rib_cutoff[4], acc)
+    #foil_dxf = foil.cell_to_dxf(0, "top", acc, 0.01, 0.02, 0.01)
     #foil_dxf = foil.cell_to_dxf(0, "bot", acc, 0.02, 0.02, 0.01)
-    #foil_dxf = foil.cell_to_dxf(1, "top", acc, 0.02, 0.02, 0.01)
+    foil_dxf = foil.cell_to_dxf(3, "top", acc, 0.02, 0.02, 0.01, 0.01, debug=True)
     #foil_dxf = foil.cell_to_dxf(1, "bot", acc, 0.02, 0.02, 0.01)
-    scale = min((simSize[0] / 2) / (foil.limits[0][1] - foil.limits[0][0]),
-                (simSize[1] / 2) / (foil.limits[0][1] - foil.limits[0][0]),
-                (simSize[0] / 2) / (foil.limits[1][1] - foil.limits[1][0]),
-                (simSize[1] / 2) / (foil.limits[1][1] - foil.limits[1][0]),
-                (simSize[0] / 2) / (foil.limits[2][1] - foil.limits[2][0]),
-                (simSize[1] / 2) / (foil.limits[2][1] - foil.limits[2][0])) * 1.25
     scale_dxf = min((simSize[0] / 2) / (foil_dxf.limits[0][1] - foil_dxf.limits[0][0]),
                     (simSize[1] / 2) / (foil_dxf.limits[0][1] - foil_dxf.limits[0][0]),
                     (simSize[0] / 2) / (foil_dxf.limits[1][1] - foil_dxf.limits[1][0]),
                     (simSize[1] / 2) / (foil_dxf.limits[1][1] - foil_dxf.limits[1][0]),
                     (simSize[0] / 2) / (foil_dxf.limits[2][1] - foil_dxf.limits[2][0]),
                     (simSize[1] / 2) / (foil_dxf.limits[2][1] - foil_dxf.limits[2][0])) * 0.9
+    scale = min((simSize[0] / 2) / (foil.limits[0][1] - foil.limits[0][0]),
+                (simSize[1] / 2) / (foil.limits[0][1] - foil.limits[0][0]),
+                (simSize[0] / 2) / (foil.limits[1][1] - foil.limits[1][0]),
+                (simSize[1] / 2) / (foil.limits[1][1] - foil.limits[1][0]),
+                (simSize[0] / 2) / (foil.limits[2][1] - foil.limits[2][0]),
+                (simSize[1] / 2) / (foil.limits[2][1] - foil.limits[2][0])) * 1.25
     origin = np.asarray(((simSize[0] / 4 * 3 - np.average(foil.limits[2]) * scale,
                           simSize[1] / 4 * 3 + np.average(foil.limits[1]) * scale),
                          (simSize[0] / 4 - np.average(foil.limits[0]) * scale,
@@ -62,9 +63,9 @@ if __name__ == "__main__":
         gameDisplay.fill(black)
         pg.draw.line(gameDisplay, white, [0, simSize[1] / 2], [simSize[0], simSize[1] / 2])
         pg.draw.line(gameDisplay, white, [simSize[0] / 2, 0], [simSize[0] / 2, simSize[1]])
-        foil.draw(gameDisplay, origin[0], scale, "x", red, green, blue, white, True)
-        foil.draw(gameDisplay, origin[1], scale, "y", red, green, blue, white, True)
-        foil.draw(gameDisplay, origin[2], scale, "z", red, green, blue, white, True)
+        foil.draw(gameDisplay, origin[0], scale, "x", red, green, blue, (), True)
+        foil.draw(gameDisplay, origin[1], scale, "y", red, green, blue, (), True)
+        foil.draw(gameDisplay, origin[2], scale, "z", red, green, blue, (), True)
         foil_dxf.draw(gameDisplay, origin[3], scale_dxf, "z", red)
         pg.draw.circle(gameDisplay, blue, origin[3], 2)
 

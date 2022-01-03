@@ -135,7 +135,7 @@ class Vector(object):
         elif type(other) == VectorAirfoil:
             v1 = self.rotate(other.v1, angle)
             v2 = self.rotate(other.v2, angle)
-            return VectorAirfoil(other.points2d, v1, v2)
+            return VectorAirfoil(other.upper, other.lower, v1, v2, other.length)
 
     def project(self, other):
         if not self.origin:
@@ -255,7 +255,7 @@ class Plane(object):
                 raise ValueError("Can not mirror an airfoil without origin through a plane")
             v0 = self.mirror(other.v1)
             v1 = self.mirror(other.v2)
-            return VectorAirfoil(other.points2d, v0, v1)
+            return VectorAirfoil(other.upper, other.lower, v0, v1, other.length)
 
 
 class VectorAirfoilFactory(object):
@@ -283,89 +283,160 @@ class VectorAirfoilFactory(object):
         self.upper_func = sp.interpolate.interp1d(self.points[:self.flip + 1:, 0], self.points[:self.flip + 1, 1])
         self.lower_func = sp.interpolate.interp1d(self.points[self.flip:, 0], self.points[self.flip:, 1])
 
-    def generate(self, cord_line, thickness_line, acc=100):
-        points2d = []
+    def generate(self, cord_line, thickness_line, offset=0.0, acc=100):
+        points2dupper = []
+        points2dlower = []
         for c in np.arange(0.0, 1.0 + 1 / acc, 1 / acc):
-            points2d.append([c * cord_line.length, self.upper_func(c) * thickness_line.length])
-        for c in np.arange(1.0 - 1 / acc,  0.0, -1 / acc):
-            points2d.append([c * cord_line.length, self.lower_func(c) * thickness_line.length])
-        return VectorAirfoil(np.asarray(points2d), cord_line, thickness_line)
+            points2dupper.append([c * (cord_line.length - offset), self.upper_func(c) * thickness_line.length])
+        points2dupper.append([cord_line.length, 0.0])
+        for c in np.arange(0.0,  1.0, 1 / acc):
+            points2dlower.append([c * (cord_line.length - offset), self.lower_func(c) * thickness_line.length])
+        points2dlower.append([cord_line.length - offset, 0.0])
+        points2dlower.append([cord_line.length, 0.0])
+        return VectorAirfoil(np.asarray(points2dupper), np.asarray(points2dlower), cord_line, thickness_line,
+                             cord_line.length)
 
 
 class VectorAirfoil(Plane):
 
-    def __init__(self, points, cord_line, thickness_line):
+    def __init__(self, upper, lower, cord_line, thickness_line, length):
+        self.length = length
         super().__init__(cord_line, thickness_line, cord_line.p0)
-        self.points2d = points
+        if type(upper) == np.ndarray:
+            self.upper = sp.interpolate.interp1d(upper[:, 0], upper[:, 1])
+        else:
+            self.upper = upper
+        if type(lower) == np.ndarray:
+            self.lower = sp.interpolate.interp1d(lower[:, 0], lower[:, 1])
+        else:
+            self.lower = lower
 
     @property
-    def lines(self):
-        ret = []
-        for p in range(0, len(self.points2d)):
-            ret.append(self.get_point(self.points2d[p - 1]).span(self.get_point(self.points2d[p])))
-        ret.append(ret[0])
-        ret.pop(0)
-        return ret
-
-    @property
-    def limits(self):
+    def limits(self, acc=100):
         ret = np.zeros((3, 2), dtype=float)
-        for l in self.lines:
-            ret[0, 0] = min(ret[0, 0], l.p0.pos[0])
-            ret[0, 1] = max(ret[0, 1], l.p0.pos[0])
-            ret[1, 0] = min(ret[1, 0], l.p0.pos[1])
-            ret[1, 1] = max(ret[1, 1], l.p0.pos[1])
-            ret[2, 0] = min(ret[2, 0], l.p0.pos[2])
-            ret[2, 1] = max(ret[2, 1], l.p0.pos[2])
+        cord = np.arange(0, self.length, 1 / acc)
+        cord = np.append(cord, [self.length])
+        for c in cord:
+            ret[0, 0] = min(ret[0, 0], self.get_point((c, self.upper(c))).pos[0],
+                            self.get_point((c, self.lower(c))).pos[0])
+            ret[0, 1] = max(ret[0, 1], self.get_point((c, self.upper(c))).pos[0],
+                            self.get_point((c, self.lower(c))).pos[0])
+            ret[1, 0] = min(ret[1, 0], self.get_point((c, self.upper(c))).pos[1],
+                            self.get_point((c, self.lower(c))).pos[1])
+            ret[1, 1] = max(ret[1, 1], self.get_point((c, self.upper(c))).pos[1],
+                            self.get_point((c, self.lower(c))).pos[1])
+            ret[2, 0] = min(ret[2, 0], self.get_point((c, self.upper(c))).pos[2],
+                            self.get_point((c, self.lower(c))).pos[2])
+            ret[2, 1] = max(ret[2, 1], self.get_point((c, self.upper(c))).pos[2],
+                            self.get_point((c, self.lower(c))).pos[2])
         return ret
 
-    def draw(self, window, offset, scale, view, color):
-        for l in self.lines:
+    def lines(self, acc=100):
+        ret = []
+        cord = np.arange(self.length,  -1 / acc, -1 / acc)
+        cord[-1] = 0.0
+        for c in range(0, len(cord) - 1):
+            ret.append(self.get_point((cord[c], self.upper(cord[c]))).span(self.get_point(
+                (cord[c+1], self.upper(cord[c+1])))))
+        cord = np.arange(0, self.length, 1 / acc)
+        cord = np.append(cord, [self.length])
+        for c in range(0, len(cord) - 1):
+            ret.append(self.get_point((cord[c], self.lower(cord[c]))).span(self.get_point(
+                (cord[c + 1], self.lower(cord[c + 1])))))
+        return ret
+
+    def draw(self, window, offset, scale, view, color, acc=100):
+        for l in self.lines(acc):
             l.draw(window, offset, scale, view, color)
 
-    def to_dxf(self, allowance_top, allowance_bot):
+    def to_dxf(self, allowance_top, allowance_bot, allowance_front, offset, top_cutoff_side, top_cutoff, bottom_cutoff,
+               rib_cutoff, acc=100):
         points = []
         rotator = Vector(np.asarray([0.0, 0.0, 1.0]))
-        points.append(Point(np.asarray([self.points2d[0][0], self.points2d[0][1], 0.0])))
-        top = True
-        prev_angle = -np.pi/2
-        for p in range(0, len(self.points2d) - 1):
-            line = Point(np.asarray([self.points2d[p][0], self.points2d[p][1], 0.0])).span(
-                Point(np.asarray([self.points2d[p+1][0], self.points2d[p+1][1], 0.0])))
+        if top_cutoff_side == "t":
+            c = np.linspace(self.length - offset - rib_cutoff,  top_cutoff, acc)
+            pt = np.transpose(np.asarray([c, self.upper(c)]))
+        elif top_cutoff_side == "b":
+            c = np.linspace(self.length - offset - rib_cutoff, 0.0, acc, endpoint=False)
+            pt = np.transpose(np.asarray([c, self.upper(c)]))
+            c = np.linspace(0.0, top_cutoff, acc)
+            pt = np.append(pt, np.transpose(np.asarray([c, self.lower(c)])), 0)
+
+        if top_cutoff == 0.0 and bottom_cutoff == 0.0 or (top_cutoff_side == "b" and top_cutoff == bottom_cutoff):
+            pf = []
+        elif top_cutoff_side == "t":
+            c = np.linspace(top_cutoff, 0.0, acc, endpoint=False)
+            pf = np.transpose(np.asarray([c, self.upper(c)]))
+            c = np.linspace(0.0, bottom_cutoff, acc)
+            pf = np.append(pf, np.transpose(np.asarray([c, self.lower(c)])), 0)
+        elif top_cutoff_side == "b":
+            c = np.linspace(top_cutoff, bottom_cutoff, acc)
+            pf = np.transpose(np.asarray([c, self.lower(c)]))
+
+        c = np.linspace(bottom_cutoff, self.length - offset - rib_cutoff, acc)
+        pb = np.transpose(np.asarray([c, self.lower(c)]))
+
+        points.append(Point(np.asarray([pt[0][0], pt[0][1], 0.0])))
+        prev_angle = np.pi/2
+        for p in range(0, len(pt)-1):
+            line = Point(np.asarray([pt[p][0], pt[p][1], 0.0])).span(Point(np.asarray([pt[p + 1][0],
+                                                                                       pt[p + 1][1], 0.0])))
             rotator.origin = line.p0
-            line = rotator.rotate(line, np.pi / 2)
-            if top:
-                p0 = line.get_abs_point(allowance_top)
-            else:
-                p0 = line.get_abs_point(allowance_bot)
-            if line.angle_yx <= prev_angle:
+            line = rotator.rotate(line, -np.pi / 2)
+            p0 = line.get_abs_point(allowance_top)
+            if line.angle_yx >= prev_angle:
                 p1 = points[-1]
                 points[-1] = p0
                 points.append(p1)
             else:
                 points.append(p0)
-            line = Point(np.asarray([self.points2d[p+1][0], self.points2d[p+1][1], 0.0])).span(
-                Point(np.asarray([self.points2d[p][0], self.points2d[p][1], 0.0])))
+            line = Point(np.asarray([pt[p + 1][0], pt[p + 1][1], 0.0])).span(Point(np.asarray([pt[p][0],
+                                                                                               pt[p][1], 0.0])))
+            rotator.origin = line.p0
+            line = rotator.rotate(line, np.pi / 2)
+            prev_angle = line.angle_yx
+            points.append(line.get_abs_point(allowance_top))
+
+        points.append(Point(np.asarray([pf[0][0], pf[0][1], 0.0])))
+        for p in range(0, len(pf)-1):
+            line = Point(np.asarray([pf[p][0], pf[p][1], 0.0])).span(Point(np.asarray([pf[p + 1][0],
+                                                                                       pf[p + 1][1], 0.0])))
             rotator.origin = line.p0
             line = rotator.rotate(line, -np.pi / 2)
-            prev_angle = line.angle_yx
-            if top:
-                points.append(line.get_abs_point(allowance_top))
-                if self.points2d[p][0] == self.points2d[p + 2][0]:
-                    top = False
-                    points.append(Point(np.asarray([self.points2d[p + 1][0], self.points2d[p + 1][1], 0.0])))
+            p0 = line.get_abs_point(allowance_front)
+            if line.angle_yx >= prev_angle:
+                p1 = points[-1]
+                points[-1] = p0
+                points.append(p1)
             else:
-                points.append(line.get_abs_point(allowance_bot))
-        line = Point(np.asarray([self.points2d[-1][0], self.points2d[-1][1], 0.0])).span(
-            Point(np.asarray([self.points2d[0][0], self.points2d[0][1], 0.0])))
-        rotator.origin = line.p0
-        line = rotator.rotate(line, np.pi / 2)
-        points.append(line.get_abs_point(allowance_bot))
-        line = Point(np.asarray([self.points2d[0][0], self.points2d[0][1], 0.0])).span(
-            Point(np.asarray([self.points2d[-1][0], self.points2d[-1][1], 0.0])))
-        rotator.origin = line.p0
-        line = rotator.rotate(line, -np.pi / 2)
-        points.append(line.get_abs_point(allowance_bot))
+                points.append(p0)
+            line = Point(np.asarray([pf[p + 1][0], pf[p + 1][1], 0.0])).span(Point(np.asarray([pf[p][0],
+                                                                                               pf[p][1], 0.0])))
+            rotator.origin = line.p0
+            line = rotator.rotate(line, np.pi / 2)
+            prev_angle = line.angle_yx
+            points.append(line.get_abs_point(allowance_front))
+
+        points.append(Point(np.asarray([pb[0][0], pb[0][1], 0.0])))
+        for p in range(0, len(pb) - 1):
+            line = Point(np.asarray([pb[p][0], pb[p][1], 0.0])).span(Point(np.asarray([pb[p + 1][0],
+                                                                                       pb[p + 1][1], 0.0])))
+            rotator.origin = line.p0
+            line = rotator.rotate(line, -np.pi / 2)
+            p0 = line.get_abs_point(allowance_bot)
+            if line.angle_yx >= prev_angle:
+                p1 = points[-1]
+                points[-1] = p0
+                points.append(p1)
+            else:
+                points.append(p0)
+            line = Point(np.asarray([pb[p + 1][0], pb[p + 1][1], 0.0])).span(Point(np.asarray([pb[p][0],
+                                                                                               pb[p][1], 0.0])))
+            rotator.origin = line.p0
+            line = rotator.rotate(line, np.pi / 2)
+            prev_angle = line.angle_yx
+            points.append(line.get_abs_point(allowance_bot))
+        points.append(Point(np.asarray([pb[-1][0], pb[-1][1], 0.0])))
 
         lines = []
         for p in range(0, len(points)):
