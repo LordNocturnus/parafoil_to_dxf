@@ -181,16 +181,25 @@ class Vector(object):
         else:
             return False
 
-    def draw(self, window, offset, scale, view, color):
+    def draw(self, window, offset, scale, view, color, lim):
         if view == "x":
-            pg.draw.line(window, color, (offset[0] + self.p0.pos[2] * scale, offset[1] - self.p0.pos[1] * scale),
-                         (offset[0] + self.p1.pos[2] * scale, offset[1] - self.p1.pos[1] * scale))
+            pg.draw.line(window, color,
+                         (min(max(offset[0] + self.p0.pos[2] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p0.pos[1] * scale, lim[1, 0]), lim[1, 1])),
+                         (min(max(offset[0] + self.p1.pos[2] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p1.pos[1] * scale, lim[1, 0]), lim[1, 1])))
         elif view == "y":
-            pg.draw.line(window, color, (offset[0] + self.p0.pos[0] * scale, offset[1] - self.p0.pos[2] * scale),
-                         (offset[0] + self.p1.pos[0] * scale, offset[1] - self.p1.pos[2] * scale))
+            pg.draw.line(window, color,
+                         (min(max(offset[0] + self.p0.pos[0] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p0.pos[2] * scale, lim[1, 0]), lim[1, 1])),
+                         (min(max(offset[0] + self.p1.pos[0] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p1.pos[2] * scale, lim[1, 0]), lim[1, 1])))
         elif view == "z":
-            pg.draw.line(window, color, (offset[0] + self.p0.pos[0] * scale, offset[1] - self.p0.pos[1] * scale),
-                         (offset[0] + self.p1.pos[0] * scale, offset[1] - self.p1.pos[1] * scale))
+            pg.draw.line(window, color,
+                         (min(max(offset[0] + self.p0.pos[0] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p0.pos[1] * scale, lim[1, 0]), lim[1, 1])),
+                         (min(max(offset[0] + self.p1.pos[0] * scale, lim[0, 0]), lim[0, 1]),
+                          min(max(offset[1] - self.p1.pos[1] * scale, lim[1, 0]), lim[1, 1])))
 
 
 class Plane(object):
@@ -345,9 +354,9 @@ class VectorAirfoil(Plane):
                 (cord[c + 1], self.lower(cord[c + 1])))))
         return ret
 
-    def draw(self, window, offset, scale, view, color, acc=100):
-        for l in self.lines(acc):
-            l.draw(window, offset, scale, view, color)
+    def draw(self, window, offset, scale, view, color, lim):
+        for l in self.lines:
+            l.draw(window, offset, scale, view, color, lim)
 
     def to_dxf(self, allowance_top, allowance_bot, allowance_front, offset, top_cutoff_side, top_cutoff, bottom_cutoff,
                rib_cutoff, acc=100):
@@ -457,9 +466,9 @@ class Dxf(object):
             self.limits[2, 0] = min(self.limits[2, 0], l.p0.pos[2])
             self.limits[2, 1] = max(self.limits[2, 1], l.p0.pos[2])
 
-    def draw(self, window, offset, scale, view, color):
+    def draw(self, window, offset, scale, view, color, lim):
         for l in self.lines:
-            l.draw(window, offset, scale, view, color)
+            l.draw(window, offset, scale, view, color, lim)
 
     def export(self, name):
         doc = ezdxf.new()

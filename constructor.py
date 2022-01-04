@@ -270,21 +270,21 @@ class Parafoil(object):
     def draw(self, window, offset, scale, view, c1, c2, c3, lim, inner=True):
         if inner:
             for l in self.cord_lines:
-                l.draw(window, offset, scale, view, c3)
+                l.draw(window, offset, scale, view, c3, lim)
             for l in self.thickness_lines:
-                l.draw(window, offset, scale, view, c3)
+                l.draw(window, offset, scale, view, c3, lim)
         for l in self.leading_edge_lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.trailing_edge_lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.tip_left:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.tip_right:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for a in self.airfoils:
-            a.draw(window, offset, scale, view, c1)
+            a.draw(window, offset, scale, view, c1, lim)
 
     def flatten(self, points_left, points_right, prev_angle_left, prev_angle_right, p_left, p_right, allowance, id,
                 debug):

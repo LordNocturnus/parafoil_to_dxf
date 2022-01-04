@@ -11,6 +11,9 @@ green = (0, 255, 0)
 blue = (0, 0, 255)
 white = (255, 255, 255)
 acc = 100
+xshift = 50
+yshift = 50
+zoomshift = 50
 # -----------------
 
 
@@ -55,19 +58,41 @@ if __name__ == "__main__":
     gameDisplay = pg.display.set_mode((simSize[0], simSize[1]))
     clock = pg.time.Clock()
     ended = False
+    x = 0
+    y = 0
+    zoom = 0
 
     while not ended:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 ended = True
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_LEFT:
+                    x += 1
+                if event.key == pg.K_RIGHT:
+                    x -= 1
+                if event.key == pg.K_DOWN:
+                    y -= 1
+                if event.key == pg.K_UP:
+                    y += 1
+                if event.key == pg.K_PLUS or event.key == pg.K_KP_PLUS:
+                    zoom += 1
+                if event.key == pg.K_MINUS or event.key == pg.K_KP_MINUS:
+                    zoom -= 1
         gameDisplay.fill(black)
         pg.draw.line(gameDisplay, white, [0, simSize[1] / 2], [simSize[0], simSize[1] / 2])
         pg.draw.line(gameDisplay, white, [simSize[0] / 2, 0], [simSize[0] / 2, simSize[1]])
-        foil.draw(gameDisplay, origin[0], scale, "x", red, green, blue, (), True)
-        foil.draw(gameDisplay, origin[1], scale, "y", red, green, blue, (), True)
-        foil.draw(gameDisplay, origin[2], scale, "z", red, green, blue, (), True)
-        foil_dxf.draw(gameDisplay, origin[3], scale_dxf, "z", red)
-        pg.draw.circle(gameDisplay, blue, origin[3], 2)
+        foil.draw(gameDisplay, origin[0], scale, "x", red, green, blue, np.asarray([[0.0, simSize[0]],
+                                                                                    [0.0, simSize[1]]]), True)
+        foil.draw(gameDisplay, origin[1], scale, "y", red, green, blue, np.asarray([[0.0, simSize[0]],
+                                                                                    [0.0, simSize[1]]]), True)
+        foil.draw(gameDisplay, origin[2], scale, "z", red, green, blue, np.asarray([[0.0, simSize[0]],
+                                                                                    [0.0, simSize[1]]]), True)
+        foil_dxf.draw(gameDisplay, (origin[3, 0] + x * xshift,
+                                    origin[3, 1] + y * yshift), scale_dxf + zoomshift * zoom, "z", red,
+                      np.asarray([[simSize[0] / 2, simSize[0]], [0.0, simSize[1] / 2]]))
+        pg.draw.circle(gameDisplay, blue, (max(min(origin[3, 0] + x * xshift, simSize[0]), simSize[0] / 2),
+                                           max(min(origin[3, 1] + y * yshift, simSize[1]), 0.0)), 2)
 
         pg.display.update()
         clock.tick(60)
