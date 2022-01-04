@@ -252,24 +252,24 @@ class Parafoil(object):
                 self.limits[d][0] = min(self.limits[d][0], l.limits[d][0])
                 self.limits[d][1] = max(self.limits[d][1], l.limits[d][1])
 
-    def draw(self, window, offset, scale, view, c1, c2, c3, c4, inner=True):
+    def draw(self, window, offset, scale, view, c1, c2, c3, lim, inner=True):
         if inner:
             for l in self.cord_lines:
-                l.draw(window, offset, scale, view, c3)
+                l.draw(window, offset, scale, view, c3, lim)
             for l in self.thickness_lines:
-                l.draw(window, offset, scale, view, c3)
+                l.draw(window, offset, scale, view, c3, lim)
         for l in self.leading_edge_lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.trailing_edge_lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.lines:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.tip_left:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for l in self.tip_right:
-            l.draw(window, offset, scale, view, c2)
+            l.draw(window, offset, scale, view, c2, lim)
         for a in self.airfoils:
-            a.draw(window, offset, scale, view, c1)
+            a.draw(window, offset, scale, view, c1, lim)
 
     def cell_to_dxf(self, id, side, acc, allowance_sides, allowance_front, allowance_back, debug=False):
         if id == 0:
