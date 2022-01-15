@@ -91,14 +91,14 @@ class Airfoil(object):
 
 
 def cos_rule(a=None, b=None, c=None, theta=None):
-    if a and b and c:
-        return np.arccos((a**2 + b**2 - c**2) / (2 * a * b))
-    elif a and b and theta:
+    if a is not None and b is not None and c is not None:
+        return np.arccos(min((a**2 + b**2 - c**2) / (2 * a * b), 1.0))
+    elif a is not None and b is not None and theta is not None:
         return np.sqrt(a**2 + b**2 - 2 * a * b * np.cos(theta))
-    elif a and c and theta:
+    elif a is not None and c is not None and theta is not None:
         warnings.warn("This is not yet 100% confirmed to be correct")
         return np.sqrt(c**2 - b**2 + b**2 * np.cos(theta)**2) - b * np.cos(theta)
-    elif b and c and theta:
+    elif b is not None and c is not None and theta is not None:
         warnings.warn("This is not yet 100% confirmed to be correct")
         return np.sqrt(c**2 - a**2 + a**2 * np.cos(theta)**2) - a * np.cos(theta)
     else:

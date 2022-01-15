@@ -181,6 +181,26 @@ class Vector(object):
         else:
             return False
 
+    def intersect(self, other, debug=False):
+        t = ((self.p0.pos[0] - other.p0.pos[0]) * (other.p0.pos[1] - other.p1.pos[1]) -
+             (self.p0.pos[1] - other.p0.pos[1]) * (other.p0.pos[0] - other.p1.pos[0])) /\
+            ((self.p0.pos[0] - self.p1.pos[0]) * (other.p0.pos[1] - other.p1.pos[1]) -
+             (self.p0.pos[1] - self.p1.pos[1]) * (other.p0.pos[0] - other.p1.pos[0]))
+        u = ((self.p0.pos[0] - other.p0.pos[0]) * (other.p0.pos[1] - self.p1.pos[1]) -
+             (self.p0.pos[1] - other.p0.pos[1]) * (other.p0.pos[0] - self.p1.pos[0])) / \
+            ((self.p0.pos[0] - self.p1.pos[0]) * (other.p0.pos[1] - other.p1.pos[1]) -
+             (self.p0.pos[1] - self.p1.pos[1]) * (other.p0.pos[0] - other.p1.pos[0]))
+        if debug:
+            return t, u
+        if t < -0.0 or t > 1.0:
+            return False
+        if u < -0.0 or u > 1.0:
+            return False
+        if not self.get_rel_point(t).pos[2] == other.get_rel_point(u).pos[2]:
+            return False
+
+        return True
+
     def draw(self, window, offset, scale, view, color, lim):
         if view == "x":
             pg.draw.line(window, color,
@@ -355,7 +375,7 @@ class VectorAirfoil(Plane):
         return ret
 
     def draw(self, window, offset, scale, view, color, lim):
-        for l in self.lines:
+        for l in self.lines():
             l.draw(window, offset, scale, view, color, lim)
 
     def to_dxf(self, allowance_top, allowance_bot, allowance_front, offset, top_cutoff_side, top_cutoff, bottom_cutoff,
@@ -406,7 +426,7 @@ class VectorAirfoil(Plane):
             prev_angle = line.angle_yx
             points.append(line.get_abs_point(allowance_top))
 
-        points.append(Point(np.asarray([pf[0][0], pf[0][1], 0.0])))
+        points.append(Point(np.asarray([pt[-1][0], pt[-1][1], 0.0])))
         for p in range(0, len(pf)-1):
             line = Point(np.asarray([pf[p][0], pf[p][1], 0.0])).span(Point(np.asarray([pf[p + 1][0],
                                                                                        pf[p + 1][1], 0.0])))
@@ -455,8 +475,9 @@ class VectorAirfoil(Plane):
 
 class Dxf(object):
 
-    def __init__(self, lines):
+    def __init__(self, lines, temp=[]):
         self.lines = lines
+        self.temp = temp
         self.limits = np.zeros((3, 2), dtype=float)
         for l in self.lines:
             self.limits[0, 0] = min(self.limits[0, 0], l.p0.pos[0])
@@ -466,9 +487,12 @@ class Dxf(object):
             self.limits[2, 0] = min(self.limits[2, 0], l.p0.pos[2])
             self.limits[2, 1] = max(self.limits[2, 1], l.p0.pos[2])
 
-    def draw(self, window, offset, scale, view, color, lim):
-        for l in self.lines:
-            l.draw(window, offset, scale, view, color, lim)
+    def draw(self, window, offset, scale, view, c1, c2, lim, count):
+        for l in self.temp:
+            l.draw(window, offset, scale, view, c2, lim)
+        for l in range(0, min(len(self.lines), count)):
+            self.lines[l].draw(window, offset, scale, view, c1, lim)
+
 
     def export(self, name):
         doc = ezdxf.new()
